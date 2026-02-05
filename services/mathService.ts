@@ -1,4 +1,3 @@
-
 import { LEVEL_CONFIG, SUBJECT_NAMES } from '../constants';
 import { Result, ResultType, ClassLevel, Student, AttendanceRecord, AttendanceStatus, AnnualReportItem, StudentAnalysis } from '../types';
 
@@ -349,13 +348,45 @@ export const generateComprehensiveAnalysis = (
 
   const attStats = calculateAttendanceStats(attendanceRecords.filter(r => r.studentId === studentId));
 
-  // Auto-Recommendations
-  let teacherRecParts: string[] = [`مستوى الطالب: ${generalLevel}.`];
-  let parentRecParts: string[] = [`مستوى ابنكم: ${generalLevel}.`];
+  // --- Auto-Recommendations Logic ---
+  const attRate = attStats.presentRate;
+  const strengthStr = strengths.length > 0 ? strengths.slice(0, 3).join(' و') : '';
+  const weakStr = weaknesses.length > 0 ? weaknesses.slice(0, 3).join(' و') : '';
 
-  if (generalLevel === 'ضعيف') {
-    teacherRecParts.push("يحتاج لخطة علاجية مكثفة.");
-    parentRecParts.push("يرجى التواصل مع الإدارة.");
+  // 1. Teacher Recommendations
+  let teacherRecParts: string[] = [`مستوى الطالب العام: ${generalLevel}.`];
+  
+  // Add Attendance Context to Teacher
+  if (attRate < 80) teacherRecParts.push(`يعاني من كثرة الغياب (${attRate}%) مما يؤثر سلباً على نتائجه.`);
+  else if (attRate >= 95) teacherRecParts.push(`مواظبته ممتازة (${attRate}%).`);
+
+  // Add Academic Context to Teacher
+  if (weakStr) {
+    teacherRecParts.push(`يجب التركيز على معالجة الضعف في: ${weakStr}.`);
+  }
+  if (strengthStr) {
+    teacherRecParts.push(`يمكن الاعتماد عليه في: ${strengthStr}.`);
+  }
+
+  // 2. Parent Recommendations
+  let parentRecParts: string[] = [`مستوى ابنكم الدراسي: ${generalLevel}.`];
+
+  // Add Attendance Context to Parent
+  if (attRate < 80) {
+    parentRecParts.push(`نلفت انتباهكم لضرورة مراقبة حضوره، نسبة الحضور الحالية (${attRate}%) غير كافية.`);
+  } else if (attRate >= 95) {
+    parentRecParts.push(`نشكركم على حرصكم على مواظبة ابنكم.`);
+  }
+
+  // Add Academic Context to Parent
+  if (strengthStr && weakStr) {
+    parentRecParts.push(`هو متميز في ${strengthStr}، لكن نرجو تكثيف المراجعة المنزلية في ${weakStr}.`);
+  } else if (weakStr) {
+    parentRecParts.push(`نرجو مساعدته في المنزل للتحسن في: ${weakStr}.`);
+  } else if (strengthStr) {
+    parentRecParts.push(`ما شاء الله، نتائجه مميزة خاصة في ${strengthStr}.`);
+  } else if (generalLevel === 'ضعيف') {
+    parentRecParts.push("يرجى التواصل مع الإدارة لوضع خطة علاجية.");
   }
 
   return {
