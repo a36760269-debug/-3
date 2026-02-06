@@ -50,7 +50,7 @@ export class SmartTeacherDB extends Dexie {
     super('SmartTeacherDB');
     
     /**
-     * Database Schema Version 6.
+     * Database Schema Version 7.
      * 
      * Indexing Strategy:
      * - `id`: Primary Key (UUID).
@@ -60,12 +60,12 @@ export class SmartTeacherDB extends Dexie {
      * - `[studentId+subjectKey+type+term]`: Ensures a student cannot have duplicate grades
      *   for the same subject, type (Exam/Test), and term. This is critical for the "Upsert" logic.
      */
-    (this as any).version(6).stores({
+    (this as any).version(7).stores({
       classes: 'id, level',
       students: 'id, classId',
       results: 'id, classId, studentId, type, [studentId+subjectKey+type+term]', 
       attendance: 'id, classId, studentId, date, [studentId+date]',
-      lessons: 'id, subject, level',
+      lessons: 'id, subject, level, createdAt',
       settings: 'key',
       progress: 'id, classId, topicId, [classId+topicId]',
       studentProgress: 'id, studentId, topicId, [studentId+topicId]',

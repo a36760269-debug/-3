@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SUBJECT_NAMES } from '../constants';
 import { ClassLevel } from '../types';
 import { 
   BrainCircuit, CheckCircle, FileDown, Save, Edit3, Eye, Plus, Trash2, Tag, X,
-  ArrowUp, ArrowDown 
+  ArrowUp, ArrowDown, FolderOpen, Calendar
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -12,14 +12,22 @@ import { useLessonPlanner } from '../hooks/useLessonPlanner';
 
 const LessonPlanner = () => {
   const { 
-    state: { subject, topic, level, loading, tags, newTag, plan, isEditing },
-    setters: { setSubject, setTopic, setLevel, setNewTag, setIsEditing },
-    actions: { handleGenerate, handleSaveLocal, handleAddTag, handleRemoveTag },
+    state: { 
+      subject, topic, level, loading, tags, newTag, plan, isEditing,
+      filterSubject, filteredPlans
+    },
+    setters: { setSubject, setTopic, setLevel, setNewTag, setIsEditing, setFilterSubject },
+    actions: { 
+      handleGenerate, handleSaveLocal, handleAddTag, handleRemoveTag,
+      handleDeletePlan, handleLoadPlan
+    },
     modifiers: { 
       updatePlan, updatePhase, addPhase, removePhase, movePhase,
       updateObjective, addObjective, removeObjective, moveObjective 
     }
   } = useLessonPlanner();
+
+  const [activeTab, setActiveTab] = useState<'NEW' | 'SAVED'>('NEW');
 
   const handleExportPDF = async () => {
     setIsEditing(false);
@@ -60,61 +68,129 @@ const LessonPlanner = () => {
       <SectionTitle title="دفتر التحضير الذكي" icon={BrainCircuit} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Input Panel */}
+        {/* Input Panel / Sidebar */}
         <div className="lg:col-span-4 space-y-4 print:hidden">
            <Card className="space-y-4 sticky top-6">
-              <h3 className="font-bold border-b pb-2 text-slate-700">مدخلات الدرس</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium text-slate-600 block mb-1">المستوى</label>
-                  <select className="w-full border p-3 rounded-xl bg-white outline-none focus:border-teal-500" value={level} onChange={e => setLevel(e.target.value)}>
-                    {Object.values(ClassLevel).map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600 block mb-1">المادة</label>
-                  <select className="w-full border p-3 rounded-xl bg-white outline-none focus:border-teal-500" value={subject} onChange={e => setSubject(e.target.value)}>
-                    {Object.keys(SUBJECT_NAMES).map(k => <option key={k} value={k}>{SUBJECT_NAMES[k]}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                 <label className="text-sm font-medium text-slate-600 block mb-1">عنوان الدرس (الموضوع)</label>
-                 <input 
-                    className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
-                    placeholder="مثال: الجملة الاسمية"
-                    value={topic} onChange={e => setTopic(e.target.value)}
-                 />
+              {/* Tab Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                 <button 
+                   onClick={() => setActiveTab('NEW')}
+                   className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'NEW' ? 'bg-white shadow text-teal-700' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   <Edit3 size={16}/> تحضير جديد
+                 </button>
+                 <button 
+                   onClick={() => setActiveTab('SAVED')}
+                   className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'SAVED' ? 'bg-white shadow text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   <FolderOpen size={16}/> أرشيفي
+                 </button>
               </div>
 
-               {/* Tags Input */}
-               <div>
-                  <label className="text-sm font-medium text-slate-600 block mb-1">تصنيف (كلمات مفتاحية)</label>
-                  <div className="flex gap-2">
-                    <input
-                      className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
-                      placeholder="أضف تصنيف..."
-                      value={newTag}
-                      onChange={e => setNewTag(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAddTag()}
+              {activeTab === 'NEW' ? (
+                // --- NEW PLAN FORM ---
+                <div className="space-y-4 animate-fade-in">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1">المستوى</label>
+                      <select className="w-full border p-3 rounded-xl bg-white outline-none focus:border-teal-500" value={level} onChange={e => setLevel(e.target.value)}>
+                        {Object.values(ClassLevel).map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1">المادة</label>
+                      <select className="w-full border p-3 rounded-xl bg-white outline-none focus:border-teal-500" value={subject} onChange={e => setSubject(e.target.value)}>
+                        {Object.keys(SUBJECT_NAMES).map(k => <option key={k} value={k}>{SUBJECT_NAMES[k]}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-600 block mb-1">عنوان الدرس (الموضوع)</label>
+                    <input 
+                        className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
+                        placeholder="مثال: الجملة الاسمية"
+                        value={topic} onChange={e => setTopic(e.target.value)}
                     />
-                    <button onClick={handleAddTag} className="bg-slate-100 p-3 rounded-xl hover:bg-slate-200">
-                      <Plus size={20} className="text-slate-600" />
-                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {tags.map(tag => (
-                      <span key={tag} className="bg-teal-50 text-teal-700 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                        {tag}
-                        <button onClick={() => handleRemoveTag(tag)}><X size={12} /></button>
-                      </span>
-                    ))}
-                  </div>
-               </div>
 
-              <Button onClick={handleGenerate} disabled={loading} className="w-full mt-4">
-                {loading ? <span className="animate-pulse">جاري التحضير...</span> : 'توليد الخطة'}
-              </Button>
+                  {/* Tags Input */}
+                  <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1">تصنيف (كلمات مفتاحية)</label>
+                      <div className="flex gap-2">
+                        <input
+                          className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
+                          placeholder="أضف تصنيف..."
+                          value={newTag}
+                          onChange={e => setNewTag(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleAddTag()}
+                        />
+                        <button onClick={handleAddTag} className="bg-slate-100 p-3 rounded-xl hover:bg-slate-200">
+                          <Plus size={20} className="text-slate-600" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {tags.map(tag => (
+                          <span key={tag} className="bg-teal-50 text-teal-700 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                            {tag}
+                            <button onClick={() => handleRemoveTag(tag)}><X size={12} /></button>
+                          </span>
+                        ))}
+                      </div>
+                  </div>
+
+                  <Button onClick={handleGenerate} disabled={loading} className="w-full mt-4">
+                    {loading ? <span className="animate-pulse">جاري التحضير...</span> : 'توليد الخطة'}
+                  </Button>
+                </div>
+              ) : (
+                // --- SAVED PLANS LIST ---
+                <div className="space-y-4 animate-fade-in">
+                   <div>
+                      <label className="text-sm font-medium text-slate-600 block mb-1">تصفية حسب المادة</label>
+                      <select 
+                        className="w-full border p-3 rounded-xl bg-white outline-none focus:border-blue-500" 
+                        value={filterSubject} 
+                        onChange={e => setFilterSubject(e.target.value)}
+                      >
+                        <option value="ALL">الكل</option>
+                        {Object.keys(SUBJECT_NAMES).map(k => <option key={k} value={k}>{SUBJECT_NAMES[k]}</option>)}
+                      </select>
+                   </div>
+                   
+                   <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                      {filteredPlans.length > 0 ? (
+                        filteredPlans.map(p => (
+                          <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3 hover:shadow-md transition cursor-pointer group" onClick={() => handleLoadPlan(p)}>
+                             <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{p.topic}</h4>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDeletePlan(p.id); }}
+                                  className="text-slate-300 hover:text-red-500 p-1"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                             </div>
+                             <div className="flex justify-between items-end">
+                                <div>
+                                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">{SUBJECT_NAMES[p.subject]}</span>
+                                   <span className="text-[10px] text-slate-400 block mt-1 flex items-center gap-1">
+                                      <Calendar size={10} />
+                                      {new Date(p.createdAt).toLocaleDateString('ar-MA')}
+                                   </span>
+                                </div>
+                                <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">{p.level}</span>
+                             </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-slate-400">
+                           <FolderOpen size={32} className="mx-auto mb-2 opacity-50" />
+                           <p className="text-sm">لا توجد دروس محفوظة</p>
+                        </div>
+                      )}
+                   </div>
+                </div>
+              )}
            </Card>
         </div>
 

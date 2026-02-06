@@ -243,6 +243,10 @@ export const getLessonPlans = async (): Promise<LessonPlan[]> => {
   return await db.lessons.orderBy('createdAt').reverse().toArray();
 };
 
+export const deleteLessonPlan = async (id: string) => {
+  await db.lessons.delete(id);
+};
+
 // --- STUDENT NOTES ---
 
 export const saveStudentNote = async (studentId: string, content: string) => {

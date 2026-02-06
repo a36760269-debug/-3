@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { initGemini, generateLessonPlan } from '../services/geminiService';
-import { saveLessonPlan } from '../services/storageService';
+import { saveLessonPlan, getLessonPlans, deleteLessonPlan } from '../services/storageService';
 import { SUBJECT_NAMES } from '../constants';
-import { ClassLevel } from '../types';
+import { ClassLevel, LessonPlan } from '../types';
 
 export const useLessonPlanner = () => {
   const location = useLocation();
@@ -17,6 +17,14 @@ export const useLessonPlanner = () => {
   const [plan, setPlan] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(true);
 
+  // Saved Plans State
+  const [savedPlans, setSavedPlans] = useState<LessonPlan[]>([]);
+  const [filterSubject, setFilterSubject] = useState<string>('ALL');
+
+  useEffect(() => {
+    refreshPlans();
+  }, []);
+
   useEffect(() => {
     if (location.state) {
       const { level: navLevel, subject: navSubject, topic: navTopic } = location.state as any;
@@ -25,6 +33,11 @@ export const useLessonPlanner = () => {
       if (navTopic) setTopic(navTopic);
     }
   }, [location.state]);
+
+  const refreshPlans = async () => {
+    const plans = await getLessonPlans();
+    setSavedPlans(plans);
+  };
 
   // --- ACTIONS ---
 
@@ -51,13 +64,35 @@ export const useLessonPlanner = () => {
     try {
       await saveLessonPlan({ 
         subject, 
-        topic, 
+        topic: plan.title || topic, // Use title from generated plan if available
         level, 
         content: JSON.stringify({...plan, tags}) 
       });
       alert("تم حفظ الخطة في السجل المحلي");
+      refreshPlans();
     } catch (e) {
       alert("حدث خطأ أثناء الحفظ");
+    }
+  };
+
+  const handleDeletePlan = async (id: string) => {
+    if(window.confirm('هل أنت متأكد من حذف هذه الخطة؟')) {
+      await deleteLessonPlan(id);
+      refreshPlans();
+    }
+  };
+
+  const handleLoadPlan = (saved: LessonPlan) => {
+    try {
+      const content = JSON.parse(saved.content);
+      setPlan(content);
+      setSubject(saved.subject);
+      setTopic(saved.topic);
+      setLevel(saved.level as string);
+      setTags(content.tags || []);
+      setIsEditing(false); // View mode initially
+    } catch (e) {
+      alert("فشل تحميل محتوى الخطة");
     }
   };
 
@@ -130,15 +165,21 @@ export const useLessonPlanner = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  const filteredPlans = filterSubject === 'ALL' 
+    ? savedPlans 
+    : savedPlans.filter(p => p.subject === filterSubject);
+
   return {
     state: {
-      subject, topic, level, loading, tags, newTag, plan, isEditing
+      subject, topic, level, loading, tags, newTag, plan, isEditing,
+      savedPlans, filterSubject, filteredPlans
     },
     setters: {
-      setSubject, setTopic, setLevel, setNewTag, setIsEditing
+      setSubject, setTopic, setLevel, setNewTag, setIsEditing, setFilterSubject
     },
     actions: {
-      handleGenerate, handleSaveLocal, handleAddTag, handleRemoveTag
+      handleGenerate, handleSaveLocal, handleAddTag, handleRemoveTag,
+      handleDeletePlan, handleLoadPlan
     },
     modifiers: {
       updatePlan, updatePhase, addPhase, removePhase, movePhase,
